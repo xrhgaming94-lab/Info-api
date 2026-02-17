@@ -25,7 +25,7 @@ def extract_token_from_response(data, region):
 def get_jwt_token_sync(region):
     global jwt_token
     endpoints = {
-        "IND": "https://jwt-token-api-by-ajay-seven.vercel.app/token?uid=4422013059&password=9A14867BBA0091781F5BBAC54DDC945B7C3B317B5C35E01AA62BC67DD910F22F",
+        "IND": "https://sycoxjwt.vercel.app/token?uid=4422013059&password=9A14867BBA0091781F5BBAC54DDC945B7C3B317B5C35E01AA62BC67DD910F22F",
         "BR": "https://jwt-token-api-by-ajay-seven.vercel.app/token?uid=4422013059&password=9A14867BBA0091781F5BBAC54DDC945B7C3B317B5C35E01AA62BC67DD910F22F",
         "US": "https://jwt-token-api-by-ajay.vercel.app/token?uid=4422013059&password=9A14867BBA0091781F5BBAC54DDC945B7C3B317B5C35E01AA62BC67DD910F22F",
         "SAC": "https://jwt-token-api-by-ajay.vercel.app/token?uid=4422013059&password=9A14867BBA0091781F5BBAC54DDC945B7C3B317B5C35E01AA62BC67DD910F22F",
