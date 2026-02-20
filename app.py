@@ -51,7 +51,7 @@ def get_jwt_token_sync(region):
     """Fetch JWT token synchronously for a region."""
     global jwt_token
     endpoints = {
-        "IND": "https://star-jwt-api.vercel.app/token?uid=4526359122&password=STAR-2PBGMINYG-CORE",
+        "IND": "https://star-jwt-gen.vercel.app/token?uid=4526359122&password=STAR-2PBGMINYG-CORE",
         "BR": "https://raihan-access-to-jwt.vercel.app/token?uid=4345418798&password=JOBAYAR_GK6VJ",
         "US": "https://raihan-access-to-jwt.vercel.app/token?uid=3787481313&password=JlOivPeosauV0l9SG6gwK39lH3x2kJkO",
         "SAC": "https://raihan-access-to-jwt.vercel.app/token?uid=4349229968&password=GARENA_KI_MKC_50WO1_BY_KALLU_CODEX_22WFM",
@@ -185,7 +185,7 @@ def get_player_info():
         message = AccountPersonalShowInfo()
         message.ParseFromString(bytes.fromhex(api_response))
         result = MessageToDict(message)
-        result['Owners'] = ['KALLU CODEX!!']
+        result['Owners'] = ['@STAR_METHODE!!']
         return jsonify(result)
     
     except ValueError:
