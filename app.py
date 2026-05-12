@@ -63,13 +63,43 @@ def get_account_credentials(region: str) -> str:
     r = region.upper()
 
     if r == "IND":
-        return "uid=4569404695&password=RAGHAVLIKESBOT_RAGHAV_2THCG"
-    elif r in {"ME", "ID", "VN", "TH","BD","PK","TW","SG","EUROPE"}:
-        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
+        return "uid=4657633505&password=S_47O7O_BY_STAR_GMR_E65Q7"
+
     elif r in {"BR", "US", "SAC", "NA"}:
-        return "uid=4438226807&password=10007207D207D6FE0D61FD0AF71047F51466E747B6F10928DB13E9F2F25446B7"
-    else:
+        return "uid=4514032809&password=10007207D207D6FE0D61FD0AF71047F51466E747B6F10928DB13E9F2F25446B7"
+
+    elif r == "VN":
+        return "uid=4664973977&password=S_Y0QTY_BY_STAR_GMR_NRETK"
+
+    elif r == "SG":
+        return "uid=4664973977&password=S_Y0QTY_BY_STAR_GMR_NRETK"
+
+    elif r == "ID":
+        return "uid=4708244360&password=IDOY-QSKOPFJYU-SG"
+
+    elif r == "TH":
         return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
+
+    elif r == "TW":
+        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
+
+    elif r == "BD":
+        return "uid=4664973977&password=S_Y0QTY_BY_STAR_GMR_NRETK"
+
+    elif r == "PK":
+        return "uid=4680926895&password=gamer-07G3N3MND-X64"
+
+    elif r == "ME":
+        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
+
+    elif r == "RU":
+        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
+
+    elif r == "CIS":
+        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493E"
+
+    elif r == "EUROPE":  #  ME SERVER ID GIVEN
+        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
 
 # -------------- Token Generation --------------
 
