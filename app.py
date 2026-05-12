@@ -64,56 +64,12 @@ def get_account_credentials(region: str) -> str:
 
     if r == "IND":
         return "uid=4569404695&password=RAGHAVLIKESBOT_RAGHAV_2THCG"
-
+    elif r in {"ME", "ID", "VN", "TH","BD","PK","TW","SG","EUROPE"}:
+        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
     elif r in {"BR", "US", "SAC", "NA"}:
         return "uid=4438226807&password=10007207D207D6FE0D61FD0AF71047F51466E747B6F10928DB13E9F2F25446B7"
-
-    elif r == "VN":
-        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
-
-    elif r == "SG":
-        return "uid=4708244360&password=IDOY-QSKOPFJYU-SG"
-
-    elif r == "ID":
-        return "uid=4708244360&password=IDOY-QSKOPFJYU-SG"
-
-    elif r == "TH":
-        return "uid=4708244360&password=Sumon523022_BREXX_4KQT9"
-
-    elif r == "TW":
-        return "uid=4708244360&password=Sumon523022_BREXX_4KQT9"
-
-    elif r == "BD":
-        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
-
-    elif r == "PK":
-        return "uid=4680926895&password=gamer-07G3N3MND-X64"
-
-    elif r == "ME":
-        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
-
-    elif r == "RU":
-        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
-
-    elif r == "CIS":
-        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
-
-    elif r == "EUROPE":  #  ME SERVER ID GIVEN
-        return "uid=3981271926&password=7D7BB07D77A209812A04A9B5DCA874A8B4927DAE7F67211639DF1B0902A14B6B"
-
     else:
-        # fallback to ucguest.txt
-        try:
-            with open("star.txt", "r") as f:
-                lines = [line.strip() for line in f if line.strip()]
-                if not lines:
-                    raise ValueError("star.txt is empty")
-
-                uid, password = random.choice(lines).split()
-                return f"uid={uid}&password={password}"
-
-        except Exception as e:
-            return f"ERROR: {e}"
+        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
 
 # -------------- Token Generation --------------
 
