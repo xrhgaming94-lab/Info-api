@@ -69,19 +69,19 @@ def get_account_credentials(region: str) -> str:
         return "uid=4438226807&password=10007207D207D6FE0D61FD0AF71047F51466E747B6F10928DB13E9F2F25446B7"
 
     elif r == "VN":
-        return "uid=4664973977&password=S_Y0QTY_BY_STAR_GMR_NRETK"
+        return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
 
     elif r == "SG":
-        return "uid=4664973977&password=S_Y0QTY_BY_STAR_GMR_NRETK"
+        return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
 
     elif r == "ID":
         return "uid=4708244360&password=IDOY-QSKOPFJYU-SG"
 
     elif r == "TH":
-        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
+        return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
 
     elif r == "TW":
-        return "uid=4331389599&password=Sumon523022_BREXX_4KQT9"
+        return "uid=4840729790&password=STAR_GMR-3SUZ"
 
     elif r == "BD":
         return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
