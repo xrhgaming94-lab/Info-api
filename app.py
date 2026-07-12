@@ -63,10 +63,10 @@ def get_account_credentials(region: str) -> str:
     r = region.upper()
 
     if r == "IND":
-        return "uid=4730887931&password=SGSFGFLKS4ST4RGMRL0V3LD6S6"
+        return "uid=5523153630&password=STAR_BYSTARGMR_G37WxzYO"
 
     elif r in {"BR", "US", "SAC", "NA"}:
-        return "uid=4491894118&password=43137C3346CE67B584CFEDCD88B142071B4FFEB84782271E0F1ECBA7B81A2EA2"
+        return "uid=4652831470&password=CG28C3MCWVJKQS7L5CPJHYL9SZ6U4MMTOKLHWY1DKXAN1EAKO5PGHBKDQUPAA4LK"
 
     elif r == "VN":
         return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
@@ -90,16 +90,19 @@ def get_account_credentials(region: str) -> str:
         return "uid=4680926895&password=gamer-07G3N3MND-X64"
 
     elif r == "ME":
-        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
+        return "uid=5523319335&password=STARR_BYSTARGMR_bC1hULKj"
 
     elif r == "RU":
         return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
 
     elif r == "CIS":
-        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493E"
+        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
 
     elif r == "EUROPE":  #  ME SERVER ID GIVEN
         return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
+ 
+    else:
+        return "uid=5526987100&password=STAR_BYSTARGMR_kIQcaaLn"
 
 # -------------- Token Generation --------------
 
