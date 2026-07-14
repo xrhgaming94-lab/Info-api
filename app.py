@@ -90,16 +90,16 @@ def get_account_credentials(region: str) -> str:
         return "uid=4680926895&password=gamer-07G3N3MND-X64"
 
     elif r == "ME":
-        return "uid=5523319335&password=STARR_BYSTARGMR_bC1hULKj"
+        return "uid=5523465386&password=STAR_BYSTARGMR_ecsTR4Vx"
 
     elif r == "RU":
         return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
 
     elif r == "CIS":
-        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
+        return "uid=5523465386&password=STAR_BYSTARGMR_ecsTR4Vx"
 
     elif r == "EUROPE":  #  ME SERVER ID GIVEN
-        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
+        return "uid=5523465386&password=STAR_BYSTARGMR_ecsTR4Vx"
  
     else:
         return "uid=5526987100&password=STAR_BYSTARGMR_kIQcaaLn"
