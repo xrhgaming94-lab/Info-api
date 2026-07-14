@@ -75,7 +75,7 @@ def get_account_credentials(region: str) -> str:
         return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
 
     elif r == "ID":
-        return "uid=4708244360&password=IDOY-QSKOPFJYU-SG"
+        return "uid=4641833615&password=S_WMGI4_BY_STAR_GMR_W9L05"
 
     elif r == "TH":
         return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
@@ -84,7 +84,7 @@ def get_account_credentials(region: str) -> str:
         return "uid=4840729790&password=STAR_GMR-3SUZ"
 
     elif r == "BD":
-        return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
+        return "uid=4641833615&password=S_WMGI4_BY_STAR_GMR_W9L05"
 
     elif r == "PK":
         return "uid=4680926895&password=gamer-07G3N3MND-X64"
@@ -102,7 +102,7 @@ def get_account_credentials(region: str) -> str:
         return "uid=5523465386&password=STAR_BYSTARGMR_ecsTR4Vx"
  
     else:
-        return "uid=5526987100&password=STAR_BYSTARGMR_kIQcaaLn"
+        return "uid=4641833615&password=S_WMGI4_BY_STAR_GMR_W9L05"
 
 # -------------- Token Generation --------------
 
