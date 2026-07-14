@@ -63,7 +63,7 @@ def get_account_credentials(region: str) -> str:
     r = region.upper()
 
     if r == "IND":
-        return "uid=5523153630&password=STAR_BYSTARGMR_G37WxzYO"
+        return "uid=4561759163&password=FAST_PZG7W_BY_STAR_GMR_TTTTA"
 
     elif r in {"BR", "US", "SAC", "NA"}:
         return "uid=4652831470&password=CG28C3MCWVJKQS7L5CPJHYL9SZ6U4MMTOKLHWY1DKXAN1EAKO5PGHBKDQUPAA4LK"
