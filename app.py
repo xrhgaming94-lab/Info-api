@@ -5,8 +5,7 @@ import asyncio
 import time
 import httpx
 import json
-import random
-import threading
+import os
 from collections import defaultdict
 from functools import wraps
 from flask import Flask, request, jsonify
@@ -18,7 +17,6 @@ from google.protobuf import json_format, message
 from google.protobuf.message import Message
 from Crypto.Cipher import AES
 import base64
-import os
 
 # ---------- Config ----------
 
@@ -65,22 +63,29 @@ async def json_to_proto(json_data: str, proto_message: Message) -> bytes:
     json_format.ParseDict(json.loads(json_data), proto_message)
     return proto_message.SerializeToString()
 
-# ---------- Load Guest Credentials (NO HARDCODED FALLBACK) ----------
+# ---------- Load Guest Credentials (at module import) ----------
 
 def load_guests_from_file():
     global GUEST_CREDENTIALS
     try:
-        with open('guests.json', 'r') as f:
+        # Log current working directory for debugging
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"Files in directory: {os.listdir('.')}")
+        with open('guests.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
-        # Ensure all regions have at least one entry; missing regions will remain empty
+        # Ensure all regions have at least an empty list
         for region in SUPPORTED_REGIONS:
             if region not in data or not data[region]:
-                data[region] = []   # empty list = no guest available
+                data[region] = []
         GUEST_CREDENTIALS = data
         print("✅ Guests loaded from guests.json")
+        print(f"Loaded regions: {list(GUEST_CREDENTIALS.keys())}")
     except Exception as e:
-        print(f"❌ ERROR: Could not load guests.json: {e}")
+        print(f"❌ Could not load guests.json: {e}")
         GUEST_CREDENTIALS = {}   # empty -> no credentials available
+
+# Load immediately
+load_guests_from_file()
 
 # ---------- Guest Rotation Management ----------
 
@@ -96,7 +101,7 @@ def manage_rotation(region: str):
                 del cached_tokens[region]
             print(f"🔄 Rotated guest for {region} to index {region_index[region]}")
 
-# ---------- Guest IDS (NO HARDCODED) --------------
+# ---------- Guest Credentials (No Hardcoded) ----------
 
 def get_account_credentials(region: str) -> str:
     """Return the current guest credential for the region.
@@ -108,7 +113,7 @@ def get_account_credentials(region: str) -> str:
         return guest_list[idx]
     raise ValueError(f"No guest credentials available for region {region}")
 
-# -------------- Token Generation --------------
+# -------------- Token Generation (async) --------------
 
 async def get_access_token(account: str):
     url = "https://ffmconnect.live.gop.garenanow.com/oauth/guest/token/grant"
@@ -179,22 +184,7 @@ async def create_jwt(region: str):
 
         print(f"✅ TOKEN OK [{region}] with guest index {region_index[region]}")
 
-
-async def initialize_tokens():
-    # Only create tokens for regions that have at least one guest
-    tasks = []
-    for r in SUPPORTED_REGIONS:
-        if GUEST_CREDENTIALS.get(r):
-            tasks.append(create_jwt(r))
-    if tasks:
-        await asyncio.gather(*tasks)
-    else:
-        print("⚠️ No guest credentials loaded – tokens not initialized.")
-
-async def refresh_tokens_periodically():
-    while True:
-        await asyncio.sleep(25200)
-        await initialize_tokens()
+# -------------- Token Info (Lazy Generation) --------------
 
 async def get_token_info(region: str) -> Tuple[str,str,str]:
     info = cached_tokens.get(region)
@@ -202,9 +192,15 @@ async def get_token_info(region: str) -> Tuple[str,str,str]:
     if info and time.time() < info['expires_at']:
         return info['token'], info['region'], info['server_url']
 
+    # No valid token → generate one now
+    print(f"⏳ Generating token for {region} on demand...")
     await create_jwt(region)
-    info = cached_tokens[region]
+    info = cached_tokens.get(region)
+    if not info:
+        raise ValueError(f"Failed to generate token for region {region}")
     return info['token'], info['region'], info['server_url']
+
+# -------------- Account Information --------------
 
 async def GetAccountInformation(uid, unk, region, endpoint):
     # Manage rotation before getting token
@@ -219,9 +215,9 @@ async def GetAccountInformation(uid, unk, region, endpoint):
     
     try:
         token, lock, server = await get_token_info(region)
-    except KeyError:
-        # No token available because no credentials for region
-        raise ValueError(f"No token available for region {region}")
+    except ValueError as e:
+        # Propagate error – will be caught by caller
+        raise e
 
     headers = {
         'User-Agent': USERAGENT,
@@ -269,11 +265,13 @@ def get_account_info():
     uid = request.args.get('uid')
 
     if not uid:
-        return jsonify({"error": "Please provide UID Else try correct endpoint."}), 400
+        return jsonify({"error": "Please provide UID"}), 400
 
+    # Run async function in a new event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
+    # First check if region cached
     if uid in uid_region_cache:
         try:
             data = loop.run_until_complete(
@@ -281,9 +279,10 @@ def get_account_info():
             )
             return json.dumps(data, indent=2), 200, {'Content-Type': 'application/json'}
         except Exception as e:
-            # If fails, try scanning all regions
-            pass
+            print(f"Error with cached region {uid_region_cache[uid]}: {e}")
+            # fall through to scanning all regions
 
+    # Try all regions
     for region in SUPPORTED_REGIONS:
         try:
             data = loop.run_until_complete(
@@ -291,7 +290,8 @@ def get_account_info():
             )
             uid_region_cache[uid] = region
             return json.dumps(data, indent=2), 200, {'Content-Type': 'application/json'}
-        except Exception:
+        except Exception as e:
+            print(f"Failed for region {region}: {e}")
             continue
 
     return jsonify({"error": "UID not found or no guest available for any region"}), 404
@@ -299,10 +299,17 @@ def get_account_info():
 
 @app.route('/ref-token', methods=['GET', 'POST'])
 def refresh_tokens_endpoint():
+    # On Vercel, force token regeneration for all regions
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(initialize_tokens())
+        # Generate tokens for all regions that have guests
+        tasks = []
+        for r in SUPPORTED_REGIONS:
+            if GUEST_CREDENTIALS.get(r):
+                tasks.append(create_jwt(r))
+        if tasks:
+            loop.run_until_complete(asyncio.gather(*tasks))
         return jsonify({'message': 'Tokens refreshed'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -311,7 +318,6 @@ def refresh_tokens_endpoint():
 def reload_guests():
     try:
         load_guests_from_file()
-        # Reset counters and indices to avoid stale state
         region_index.clear()
         region_calls.clear()
         cached_tokens.clear()
@@ -319,13 +325,17 @@ def reload_guests():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# === Startup ===
+@app.route('/status', methods=['GET'])
+def status():
+    """Health check endpoint – shows loaded regions and token status."""
+    return jsonify({
+        "loaded_regions": list(GUEST_CREDENTIALS.keys()),
+        "total_guests": {r: len(GUEST_CREDENTIALS[r]) for r in GUEST_CREDENTIALS},
+        "cached_tokens": list(cached_tokens.keys())
+    })
 
-async def startup():
-    load_guests_from_file()
-    await initialize_tokens()
-    asyncio.create_task(refresh_tokens_periodically())
+# No startup function, no background tasks – everything is lazy.
 
+# For local development only
 if __name__ == '__main__':
-    asyncio.run(startup())
     app.run(host='0.0.0.0', port=5001, debug=True)
