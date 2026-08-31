@@ -18,6 +18,7 @@ from google.protobuf import json_format, message
 from google.protobuf.message import Message
 from Crypto.Cipher import AES
 import base64
+import os
 
 # ---------- Config ----------
 
@@ -38,6 +39,13 @@ cache = TTLCache(maxsize=100, ttl=300)
 cached_tokens = defaultdict(dict)
 uid_region_cache = {}
 
+# ---------- Guest Rotation Globals ----------
+
+GUEST_CREDENTIALS = {}          # region -> list of credential strings
+region_index = defaultdict(int) # current guest index per region
+region_calls = defaultdict(int) # call counter per region
+ROTATION_THRESHOLD = 2          # rotate after every N calls
+
 # ----------- Helper Functions ------------
 
 def pad(text: bytes) -> bytes:
@@ -57,52 +65,48 @@ async def json_to_proto(json_data: str, proto_message: Message) -> bytes:
     json_format.ParseDict(json.loads(json_data), proto_message)
     return proto_message.SerializeToString()
 
-# ---------- Guest IDS --------------
+# ---------- Load Guest Credentials (NO HARDCODED FALLBACK) ----------
+
+def load_guests_from_file():
+    global GUEST_CREDENTIALS
+    try:
+        with open('guests.json', 'r') as f:
+            data = json.load(f)
+        # Ensure all regions have at least one entry; missing regions will remain empty
+        for region in SUPPORTED_REGIONS:
+            if region not in data or not data[region]:
+                data[region] = []   # empty list = no guest available
+        GUEST_CREDENTIALS = data
+        print("✅ Guests loaded from guests.json")
+    except Exception as e:
+        print(f"❌ ERROR: Could not load guests.json: {e}")
+        GUEST_CREDENTIALS = {}   # empty -> no credentials available
+
+# ---------- Guest Rotation Management ----------
+
+def manage_rotation(region: str):
+    """Increment call counter and rotate guest if threshold reached."""
+    global region_calls, region_index, cached_tokens
+    region_calls[region] += 1
+    if region_calls[region] % ROTATION_THRESHOLD == 0:
+        guest_list = GUEST_CREDENTIALS.get(region, [])
+        if guest_list:
+            region_index[region] = (region_index[region] + 1) % len(guest_list)
+            if region in cached_tokens:
+                del cached_tokens[region]
+            print(f"🔄 Rotated guest for {region} to index {region_index[region]}")
+
+# ---------- Guest IDS (NO HARDCODED) --------------
 
 def get_account_credentials(region: str) -> str:
-    r = region.upper()
-
-    if r == "IND":
-        return "uid=4673260516&password=S_STAR_DAIE4"
-
-    elif r in {"BR", "US", "SAC", "NA"}:
-        return "uid=4652831470&password=CG28C3MCWVJKQS7L5CPJHYL9SZ6U4MMTOKLHWY1DKXAN1EAKO5PGHBKDQUPAA4LK"
-
-    elif r == "VN":
-        return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
-
-    elif r == "SG":
-        return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
-
-    elif r == "ID":
-        return "uid=4641833615&password=S_WMGI4_BY_STAR_GMR_W9L05"
-
-    elif r == "TH":
-        return "uid=4671789121&password=S_DG36B_BY_STAR_GMR_TGPQ9"
-
-    elif r == "TW":
-        return "uid=4840729790&password=STAR_GMR-3SUZ"
-
-    elif r == "BD":
-        return "uid=4641833615&password=S_WMGI4_BY_STAR_GMR_W9L05"
-
-    elif r == "PK":
-        return "uid=4680926895&password=gamer-07G3N3MND-X64"
-
-    elif r == "ME":
-        return "uid=5523465386&password=STAR_BYSTARGMR_ecsTR4Vx"
-
-    elif r == "RU":
-        return "uid=4275417742&password=CCBD38AAC5A1FA5807FD683B6DD0EE6C5F4F7447DD51C6D30062CD425B10E493"
-
-    elif r == "CIS":
-        return "uid=5523465386&password=STAR_BYSTARGMR_ecsTR4Vx"
-
-    elif r == "EUROPE":  #  ME SERVER ID GIVEN
-        return "uid=5523465386&password=STAR_BYSTARGMR_ecsTR4Vx"
- 
-    else:
-        return "uid=4641833615&password=S_WMGI4_BY_STAR_GMR_W9L05"
+    """Return the current guest credential for the region.
+    Raises ValueError if no guest is available.
+    """
+    guest_list = GUEST_CREDENTIALS.get(region.upper(), [])
+    idx = region_index[region.upper()]
+    if guest_list and idx < len(guest_list):
+        return guest_list[idx]
+    raise ValueError(f"No guest credentials available for region {region}")
 
 # -------------- Token Generation --------------
 
@@ -122,7 +126,12 @@ async def get_access_token(account: str):
 
 
 async def create_jwt(region: str):
-    account = get_account_credentials(region)
+    try:
+        account = get_account_credentials(region)
+    except ValueError as e:
+        print(f"❌ {e}")
+        return
+
     token_val, open_id = await get_access_token(account)
 
     body = json.dumps({
@@ -135,7 +144,7 @@ async def create_jwt(region: str):
     proto_bytes = await json_to_proto(body, FreeFire_pb2.LoginReq())
     payload = aes_cbc_encrypt(MAIN_KEY, MAIN_IV, proto_bytes)
 
-    url = "https://loginbp.ggpolarbear.com/MajorLogin"  # ✅ more stable
+    url = "https://loginbp.ggpolarbear.com/MajorLogin"
     headers = {
         'User-Agent': USERAGENT,
         'Connection': "Keep-Alive",
@@ -150,7 +159,6 @@ async def create_jwt(region: str):
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.post(url, data=payload, headers=headers)
 
-        # ✅ SKIP BAD RESPONSES
         if resp.status_code != 200 or resp.headers.get("content-type") != "application/octet-stream":
             print(f"❌ TOKEN FAIL [{region}]: {resp.content}")
             return
@@ -169,11 +177,19 @@ async def create_jwt(region: str):
             'expires_at': time.time() + 25200
         }
 
-        print(f"✅ TOKEN OK [{region}]")
+        print(f"✅ TOKEN OK [{region}] with guest index {region_index[region]}")
 
 
 async def initialize_tokens():
-    await asyncio.gather(*[create_jwt(r) for r in SUPPORTED_REGIONS])
+    # Only create tokens for regions that have at least one guest
+    tasks = []
+    for r in SUPPORTED_REGIONS:
+        if GUEST_CREDENTIALS.get(r):
+            tasks.append(create_jwt(r))
+    if tasks:
+        await asyncio.gather(*tasks)
+    else:
+        print("⚠️ No guest credentials loaded – tokens not initialized.")
 
 async def refresh_tokens_periodically():
     while True:
@@ -191,13 +207,21 @@ async def get_token_info(region: str) -> Tuple[str,str,str]:
     return info['token'], info['region'], info['server_url']
 
 async def GetAccountInformation(uid, unk, region, endpoint):
+    # Manage rotation before getting token
+    manage_rotation(region)
+
     payload = await json_to_proto(
         json.dumps({'a': uid, 'b': unk}),
         main_pb2.GetPlayerPersonalShow()
     )
 
     data_enc = aes_cbc_encrypt(MAIN_KEY, MAIN_IV, payload)
-    token, lock, server = await get_token_info(region)
+    
+    try:
+        token, lock, server = await get_token_info(region)
+    except KeyError:
+        # No token available because no credentials for region
+        raise ValueError(f"No token available for region {region}")
 
     headers = {
         'User-Agent': USERAGENT,
@@ -247,36 +271,30 @@ def get_account_info():
     if not uid:
         return jsonify({"error": "Please provide UID Else try correct endpoint."}), 400
 
-    # Create event loop safely
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # 🔁 If UID already cached with region
     if uid in uid_region_cache:
         try:
             data = loop.run_until_complete(
                 GetAccountInformation(uid, "7", uid_region_cache[uid], "/GetPlayerPersonalShow")
             )
             return json.dumps(data, indent=2), 200, {'Content-Type': 'application/json'}
-        except:
-            pass  # fallback to scanning all regions
+        except Exception as e:
+            # If fails, try scanning all regions
+            pass
 
-    # 🔍 Try all regions
     for region in SUPPORTED_REGIONS:
         try:
             data = loop.run_until_complete(
                 GetAccountInformation(uid, "7", region, "/GetPlayerPersonalShow")
             )
-
-            # Save detected region
             uid_region_cache[uid] = region
-
             return json.dumps(data, indent=2), 200, {'Content-Type': 'application/json'}
-
-        except:
+        except Exception:
             continue
 
-    return jsonify({"error": "UID not found"}), 404
+    return jsonify({"error": "UID not found or no guest available for any region"}), 404
 
 
 @app.route('/ref-token', methods=['GET', 'POST'])
@@ -285,21 +303,29 @@ def refresh_tokens_endpoint():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(initialize_tokens())
-
         return jsonify({'message': 'Tokens refreshed'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/reload-guests', methods=['GET', 'POST'])
+def reload_guests():
+    try:
+        load_guests_from_file()
+        # Reset counters and indices to avoid stale state
+        region_index.clear()
+        region_calls.clear()
+        cached_tokens.clear()
+        return jsonify({'message': 'Guests reloaded and tokens invalidated'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # === Startup ===
 
 async def startup():
+    load_guests_from_file()
     await initialize_tokens()
     asyncio.create_task(refresh_tokens_periodically())
 
 if __name__ == '__main__':
     asyncio.run(startup())
     app.run(host='0.0.0.0', port=5001, debug=True)
-# INFO API SRC BYY 
-# POWERED BY : @STAR_GMR
-# CHANNEL : @STAR_METHODE
