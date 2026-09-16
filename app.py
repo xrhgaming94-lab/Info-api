@@ -22,8 +22,8 @@ import base64
 
 MAIN_KEY = base64.b64decode('WWcmdGMlREV1aDYlWmNeOA==')
 MAIN_IV = base64.b64decode('Nm95WkRyMjJFM3ljaGpNJQ==')
-RELEASEVERSION = "OB54"
-USERAGENT = "Dalvik/2.1.0 (Linux; U; Android 13; CPH2095 Build/RKQ1.211119.001)"
+RELEASEVERSION = "OB55"
+USERAGENT = "UnityPlayer/2018.4.12f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)"
 SUPPORTED_REGIONS = [
     "IND", "SG", "ID", "BR", "VN", "US", "SAC", "NA",
     "RU", "TH", "TW", "BD", "PK", "ME", "CIS", "EUROPE"
@@ -149,16 +149,17 @@ async def create_jwt(region: str):
     proto_bytes = await json_to_proto(body, FreeFire_pb2.LoginReq())
     payload = aes_cbc_encrypt(MAIN_KEY, MAIN_IV, proto_bytes)
 
+    # NEW URL
     url = "https://loginbp.ppmainecoonghj.com/MajorLogin"
     headers = {
         'User-Agent': USERAGENT,
-        'Connection': "Keep-Alive",
-        'Accept-Encoding': "gzip",
-        'Content-Type': "application/octet-stream",
-        'Expect': "100-continue",
-        'X-Unity-Version': "2018.4.11f1",
-        'X-GA': "v1 1",
-        'ReleaseVersion': RELEASEVERSION
+        'Accept': '*/*',
+        'Accept-Encoding': 'deflate, gzip',
+        'X-Ga-Sv': '1789534056',
+        'X-Ga': 'v1 1',
+        'Releaseversion': RELEASEVERSION,
+        'Content-Type': 'application/octet-stream',
+        'X-Unity-Version': '2018.4.12f1',
     }
 
     async with httpx.AsyncClient(timeout=10) as client:
@@ -226,7 +227,7 @@ async def GetAccountInformation(uid, unk, region, endpoint):
         'Content-Type': "application/octet-stream",
         'Expect': "100-continue",
         'Authorization': token,
-        'X-Unity-Version': "2018.4.11f1",
+        'X-Unity-Version': "2018.4.12f1",
         'X-GA': "v1 1",
         'ReleaseVersion': RELEASEVERSION
     }
