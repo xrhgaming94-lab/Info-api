@@ -14,7 +14,7 @@ import threading
 from collections import defaultdict
 
 TOKENS_FILE      = "tokens.json"
-REFRESH_INTERVAL = 600      # 10 minutes
+REFRESH_INTERVAL = 120      # 10 minutes
 TOKEN_LIFETIME   = 25200    # 7 hours
 
 
