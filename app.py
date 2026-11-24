@@ -6,6 +6,7 @@ import time
 import httpx
 import json
 import os
+import threading
 from collections import defaultdict
 from functools import wraps
 from flask import Flask, request, jsonify
@@ -30,10 +31,30 @@ SUPPORTED_REGIONS = [
 ]
 API_KEY = "STARGMR"
 
+# Region token sharing groups
+AMERICAS_GROUP = ["BR", "NA", "SAC", "US"]
+OTHERS_GROUP = [
+    "BD", "SG", "ID", "VN", "RU", "TH", "TW", "PK", "ME", "CIS", "EUROPE"
+]
+
+def get_allowed_regions(region: str):
+    if region == "IND":
+        return ["IND"]
+    if region in AMERICAS_GROUP:
+        # Pehle requested region, phir group ke baaki regions
+        return [region] + [r for r in AMERICAS_GROUP if r != region]
+    if region in OTHERS_GROUP:
+        return [region] + [r for r in OTHERS_GROUP if r != region]
+    return [region]
+
 app = Flask(__name__)
 CORS(app)
 response_cache = TTLCache(maxsize=1000, ttl=30)
 uid_region_cache = {}
+
+# Har 5 request par guest reload karne ke liye counter
+request_counter = 0
+counter_lock = threading.Lock()
 
 # ---------- Guests ----------
 GUEST_CREDENTIALS = {}
@@ -197,7 +218,6 @@ async def _call_personal_show(uid, token_info, ob):
 #  Higher score = newer / more recent OB data
 # ═══════════════════════════════════════════════════════════════════
 
-# Fields that appear ONLY in newer OB responses
 _NEW_BASICINFO_FIELDS = [
     'hasElitePass', 'title', 'badgeCnt', 'pinId',
     'csRankingPoints', 'showBrRank', 'showCsRank',
@@ -205,52 +225,37 @@ _NEW_BASICINFO_FIELDS = [
 ]
 
 def _freshness_score(data, current_ob):
-    """
-    Score a PersonalShow response — higher = newer data.
-    Priority order:
-      1. basicInfo.releaseVersion == current OB  (+10000)  ← STRONGEST
-      2. basicInfo.lastLoginAt (newer timestamp)  (+0..5000)
-      3. Number of NEW fields present             (+0..900)
-      4. Richness (profileInfo, socialInfo, etc.) (+0..200)
-      5. seasonId (last resort, weak signal)      (+0..100)
-    """
     if not isinstance(data, dict):
         return 0
     bi = data.get('basicInfo') or {}
     score = 0
 
-    # ── 1. releaseVersion match (BIGGEST signal) ──
     rv = (bi.get('releaseVersion') or '').strip().upper()
     if rv:
         if rv == current_ob:
-            score += 10000          # ✅ exact OB match
+            score += 10000
             print(f"[score] releaseVersion={rv} MATCHES current → +10000")
         else:
-            score += 2000           # has version but different
+            score += 2000
             print(f"[score] releaseVersion={rv} (≠{current_ob}) → +2000")
 
-    # ── 2. lastLoginAt (newer = fresher) ──
     try:
         ll = int(bi.get('lastLoginAt') or 0)
         if ll > 0:
-            # Normalize: 2019 ≈ 1.56B, 2026 ≈ 1.79B
-            # Anything after 2024-01-01 (> 1704067200) = recent
             if ll > 1704067200:
                 score += 5000
-            elif ll > 1600000000:   # 2020+
+            elif ll > 1600000000:
                 score += 2000
-            elif ll > 1500000000:   # 2017-2020
+            elif ll > 1500000000:
                 score += 500
             else:
                 score += 100
     except Exception:
         pass
 
-    # ── 3. New-field count ──
     present = [f for f in _NEW_BASICINFO_FIELDS if f in bi]
     score += len(present) * 100
 
-    # ── 4. Richness checks ──
     pi = data.get('profileInfo') or {}
     if pi.get('clothes'):       score += 50
     if pi.get('equipedSkills'): score += 30
@@ -263,11 +268,9 @@ def _freshness_score(data, current_ob):
     ci = data.get('creditScoreInfo') or {}
     if ci.get('creditScore'):   score += 30
 
-    pbi = data.get('primeInfo') or {}
     if (bi.get('primeInfo') or {}).get('primeLevel'):
         score += 50
 
-    # ── 5. seasonId (weak fallback) ──
     try:
         season = int(bi.get('seasonId') or 0)
         score += min(season, 100)
@@ -278,7 +281,6 @@ def _freshness_score(data, current_ob):
 
 
 def _ob_from_response(data):
-    """Extract OB version literally from response body (if present)."""
     try:
         return (data.get('basicInfo') or {}).get('releaseVersion') or None
     except Exception:
@@ -309,10 +311,15 @@ async def _try_one_region(uid, region, ob):
 
 # ---------- Auto lookup: parallel, freshness-scored ----------
 async def _accinfo_lookup(uid, ob, region_hint=None):
-    # Mode 1: region pinned → trust it, no comparison
+    # Mode 1: region pinned → try pinned region, then allowed group fallback
     if region_hint:
-        print(f"[accinfo] 🎯 {uid} pinned → {region_hint}")
-        return await _try_one_region(uid, region_hint, ob)
+        allowed = get_allowed_regions(region_hint)
+        print(f"[accinfo] 🎯 {uid} pinned → {region_hint} (allowed fallback: {allowed})")
+        for reg in allowed:
+            res = await _try_one_region(uid, reg, ob)
+            if res:
+                return res
+        return None
 
     # Mode 2: auto → parallel all regions, best freshness wins
     targets = [r for r in SUPPORTED_REGIONS if token_manager.valid_for_ob(r, ob)]
@@ -361,7 +368,6 @@ async def _accinfo_lookup(uid, ob, region_hint=None):
         print(f"[accinfo] ❌ no region returned data for {uid}")
         return None
 
-    # Sort by freshness score → best wins
     successes.sort(key=lambda x: x[2], reverse=True)
     best = successes[0]
 
@@ -423,19 +429,37 @@ def get_account_info():
         return jsonify({"error": f"Invalid region '{region_param}'",
                         "supported_regions": SUPPORTED_REGIONS}), 400
 
-    if region_param and not GUEST_CREDENTIALS.get(region_param):
-        avail = [r for r in SUPPORTED_REGIONS if GUEST_CREDENTIALS.get(r)]
-        return jsonify({"error": f"No guests for region {region_param}",
-                        "available_regions": avail}), 503
+    if region_param:
+        allowed_regs = get_allowed_regions(region_param)
+        if not any(GUEST_CREDENTIALS.get(r) for r in allowed_regs):
+            avail = [r for r in SUPPORTED_REGIONS if GUEST_CREDENTIALS.get(r)]
+            return jsonify({"error": f"No guests for region {region_param} or its group",
+                            "available_regions": avail}), 503
 
     force = request.args.get('fresh') == '1'
     current_ob = get_release_version(force=force)
 
+    global request_counter
+    should_rotate_guests = False
+    with counter_lock:
+        request_counter += 1
+        if request_counter % 5 == 0:
+            should_rotate_guests = True
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        if not any(token_manager.valid_for_ob(r, current_ob)
-                   for r in SUPPORTED_REGIONS):
+        if should_rotate_guests:
+            print(f"[accinfo] 🔄 5 requests completed ({request_counter}) — reloading guests.json & refreshing tokens...")
+            load_guests_from_file()
+            token_manager.update_guests(GUEST_CREDENTIALS)
+            try:
+                loop.run_until_complete(asyncio.wait_for(
+                    token_manager.refresh_all(), timeout=30))
+            except asyncio.TimeoutError:
+                print("[accinfo] guest rotation refresh timeout")
+        elif not any(token_manager.valid_for_ob(r, current_ob)
+                     for r in SUPPORTED_REGIONS):
             print(f"[accinfo] No valid tokens for OB={current_ob} — refreshing...")
             try:
                 loop.run_until_complete(asyncio.wait_for(
@@ -458,13 +482,13 @@ def get_account_info():
     region, data = result
     uid_region_cache[uid] = region
 
-    resp_ob = _ob_from_response(data)            # OB from response body
+    resp_ob = _ob_from_response(data)
     score   = _freshness_score(data, current_ob)
 
     return json.dumps(data, indent=2), 200, {
         'Content-Type': 'application/json',
-        'X-OB-Request':  current_ob,             # OB sent in request
-        'X-OB-Response': resp_ob or 'unknown',   # OB parsed from response
+        'X-OB-Request':  current_ob,
+        'X-OB-Response': resp_ob or 'unknown',
         'X-Freshness':   str(score),
         'X-Region-Used': region,
     }
@@ -519,7 +543,6 @@ def ob_info_endpoint():
 def reload_version():
     try:
         data = fetch_ob_info(force=True)
-        import threading
         threading.Thread(
             target=lambda: asyncio.run(token_manager.refresh_all()),
             daemon=True,
@@ -558,6 +581,31 @@ def reload_guests():
         return jsonify({
             'message': 'Guests reloaded',
             'regions': {r: len(v) for r, v in GUEST_CREDENTIALS.items() if v},
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/refresh', methods=['GET', 'POST'])
+@app.route('/reload', methods=['GET', 'POST'])
+@require_api_key
+def refresh_and_reload_all():
+    try:
+        load_guests_from_file()
+        token_manager.update_guests(GUEST_CREDENTIALS)
+        ob = get_release_version(force=True)
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(token_manager.refresh_all())
+        finally:
+            loop.close()
+
+        return jsonify({
+            'message': 'Guests reloaded, OB refreshed, and all tokens regenerated',
+            'ob_version': ob,
+            'regions_with_tokens': list(token_manager.all().keys()),
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
